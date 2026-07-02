@@ -3,3 +3,7 @@ __pycache__/
 *.sqlite3
 .env
 media/uploads/
+db.sqlite3
+.git/
+staticfiles/
+media/
