@@ -79,7 +79,7 @@ def impute(request,pk):
             return JsonResponse({'error':'Original file is no longer available on the server. Please re-upload your dataset.'},status=400)
 
         ext = os.path.splitext(file_path)[1].lower()
-        if ext == '.xlsx':
+        if ext in ['.xls', '.xlsx', '.xslx']:
             df = pd.read_excel(file_path)
         else:
             df = pd.read_csv(file_path, keep_default_na=False, na_values=[])

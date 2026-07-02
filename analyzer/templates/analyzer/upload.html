@@ -65,7 +65,7 @@
         Auto<span style="color:var(--accent);">Insight</span>
       </h1>
       <p style="color:var(--text-secondary); font-size:.9rem; margin:0;">
-        Automated exploratory data analysis - upload a CSV, get instant insights.
+        Automated exploratory data analysis - upload a CSV or Excel file, get instant insights.
       </p>
     </div>
 
@@ -74,9 +74,9 @@
         <form method="post" enctype="multipart/form-data" id="uploadForm">
           {% csrf_token %}
           <div class="drop-zone" id="dropZone">
-            <input type="file" name="file" id="fileInput" accept=".csv">
-            <span class="drop-icon" id="dropIcon"><i class="bi bi-filetype-csv"></i></span>
-            <div class="drop-primary" id="dropPrimary">Drop your CSV file here</div>
+            <input type="file" name="file" id="fileInput" accept=".csv, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+            <span class="drop-icon" id="dropIcon"><i class="bi bi-folder-plus"></i></span>
+            <div class="drop-primary" id="dropPrimary">Drop your CSV or Excel file here</div>
             <div class="drop-secondary" id="dropSecondary">
               or <u onclick="document.getElementById('fileInput').click()">browse files</u> · max 50 MB
             </div>
@@ -120,7 +120,13 @@ const loadBar = document.getElementById('loadingBar');
 
 function setFile(file) {
   if (!file) return;
-  if (!file.name.toLowerCase().endsWith('.csv')) { showToast('Please select a .csv file', '✕️'); return; }
+
+  const fileName = file.name.toLowerCase();
+  if (!fileName.endsWith('.csv') && !fileName.endsWith('.xls')) {
+    showToast('Please select a .csv or .xls file', '✕️');
+    return;
+  }
+
   if (file.size > 52428800) { showToast('File too large (max 50 MB)', '✕️'); return; }
   dropZone.classList.add('selected');
   dropIcon.textContent = '✓';

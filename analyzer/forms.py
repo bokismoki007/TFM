@@ -12,9 +12,10 @@ class UploadFileForm(forms.ModelForm):
         file = self.cleaned_data.get('file')
         if file:
             ext = os.path.splitext(file.name)[1].lower()
-            if ext not in ['.csv', '.xlsx']:
-                raise forms.ValidationError('Only .csv and .xlsx files are supported.')
+            if ext not in ['.csv', '.xlsx', '.xls', '.xslx']:
+                raise forms.ValidationError('Only CSV and Excel files are supported.')
 
             if file.size > 50 * 1024 * 1024:
                 raise forms.ValidationError('File size cannot exceed 50 MB.')
+        return file
         return file

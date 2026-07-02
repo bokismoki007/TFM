@@ -70,10 +70,10 @@ def build_plot_data(df, num_cols, cat_cols, missing_counts):
 def analyze_file(file_path):
     try:
         ext = os.path.splitext(file_path)[1].lower()
-        if ext == '.xlsx':
+        if ext in ['.xls', '.xlsx', '.xslx']:
             df = pd.read_excel(file_path)
         else:
-            df = pd.read_csv(file_path, keep_default_na=False, na_values=[])
+            df = pd.read_csv(file_path)
         mc,md=detect_missing_values(df)
         num_cols=df.select_dtypes(include=[np.number]).columns.tolist()
         cat_cols=df.select_dtypes(exclude=[np.number]).columns.tolist()
