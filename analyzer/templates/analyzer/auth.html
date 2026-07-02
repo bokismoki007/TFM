@@ -1,0 +1,61 @@
+{% extends "analyzer/base.html" %}
+{% block title %}{% if mode == 'register' %}Register{% else %}Sign In{% endif %}{% endblock %}
+
+{% block extra_styles %}
+.auth-hero { min-height:calc(100vh - 65px); display:flex; align-items:center; justify-content:center; }
+.auth-card { background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius); padding:2rem; width:100%; max-width:380px; }
+.auth-title { font-size:1.4rem; font-weight:800; margin-bottom:.25rem; }
+.auth-sub { font-size:.82rem; color:var(--text-secondary); margin-bottom:1.5rem; }
+.form-row { margin-bottom:1rem; }
+.form-row label { display:block; font-size:.75rem; color:var(--text-secondary); font-weight:600; margin-bottom:.3rem; text-transform:uppercase; letter-spacing:.04em; }
+.form-row .helptext { font-size:.7rem; color:var(--text-muted); margin-top:.25rem; }
+.errorlist { list-style:none; padding:0; margin:.25rem 0 0; }
+.errorlist li { font-size:.75rem; color:var(--red); }
+{% endblock %}
+
+{% block content %}
+<div class="auth-hero">
+  <div class="auth-card">
+    <div class="auth-title">{% if mode == 'register' %}Create account{% else %}Welcome back{% endif %}</div>
+    <div class="auth-sub">{% if mode == 'register' %}Save your analysis history and access it anytime.{% else %}Sign in to access your saved analyses.{% endif %}</div>
+
+    <form method="post">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+      <div class="form-row">
+        <ul class="errorlist" style="background:var(--red-dim);border-radius:var(--radius-sm);padding:.6rem .75rem;">
+          {% for error in form.non_field_errors %}<li><i class="bi bi-exclamation-circle"></i> {{ error }}</li>{% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+      {% for field in form %}
+      <div class="form-row">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        <input class="input"
+               type="{% if 'password' in field.html_name %}password{% elif 'email' in field.html_name %}email{% else %}text{% endif %}"
+               name="{{ field.html_name }}"
+               id="{{ field.id_for_label }}"
+               {% if field.value %}value="{{ field.value }}"{% endif %}
+               {% if field.field.required %}required{% endif %}>
+        {% if field.help_text %}<div class="helptext">{{ field.help_text }}</div>{% endif %}
+        {% if field.errors %}<ul class="errorlist">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+      {% endfor %}
+      <button type="submit" class="btn-primary mt-2" style="width:100%;padding:.7rem;justify-content:center;">
+        {% if mode == 'register' %}<i class="bi bi-person-plus"></i> Create Account{% else %}<i class="bi bi-box-arrow-in-right"></i> Sign In{% endif %}
+      </button>
+    </form>
+
+    <hr class="divider">
+    <div class="text-center" style="font-size:.82rem; color:var(--text-secondary);">
+      {% if mode == 'register' %}
+        Already have an account? <a href="{% url 'login' %}" style="color:var(--accent);">Sign in</a>
+      {% else %}
+        No account yet? <a href="{% url 'register' %}" style="color:var(--accent);">Register free</a>
+      {% endif %}
+      &nbsp;·&nbsp;
+      <a href="{% url 'upload' %}" style="color:var(--text-muted);">Continue as guest</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

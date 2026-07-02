@@ -1,0 +1,310 @@
+{% extends "analyzer/base.html" %}
+{% load custom_filters %}
+{% block title %}{{ analysis.filename }}{% endblock %}
+
+{% block extra_styles %}
+.kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.5rem; }
+@media(max-width:768px){.kpi-grid{grid-template-columns:1fr 1fr;}}
+.kpi-card { background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius); padding:1rem 1.25rem; position:relative; overflow:hidden; }
+.kpi-card::before { content:''; position:absolute; top:0;left:0;right:0; height:3px; border-radius:var(--radius) var(--radius) 0 0; }
+.kpi-card.blue::before{background:var(--accent);}.kpi-card.green::before{background:var(--green);}
+.kpi-card.yellow::before{background:var(--yellow);}.kpi-card.red::before{background:var(--red);}
+.kpi-value{font-size:2rem;font-weight:800;line-height:1;letter-spacing:-.03em;margin-bottom:.2rem;}
+.kpi-label{font-size:.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.07em;}
+.chart-box{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem 1.25rem 1.25rem;margin-bottom:1.25rem;}
+.chart-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-secondary);margin-bottom:.85rem;padding-bottom:.6rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;}
+@media(max-width:900px){.charts-grid{grid-template-columns:1fr;}}
+.type-pill{font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;display:inline-block;}
+.type-numeric{background:rgba(79,110,247,.15);color:var(--accent);}
+.type-text{background:rgba(34,197,94,.12);color:var(--green);}
+.type-datetime{background:rgba(245,158,11,.12);color:var(--yellow);}
+.impute-row{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.75rem 1rem;display:grid;grid-template-columns:170px 75px 1fr 200px;gap:.75rem;align-items:center;margin-bottom:.5rem;}
+@media(max-width:700px){.impute-row{grid-template-columns:1fr 1fr;}}
+.wiki-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;display:flex;gap:1rem;align-items:flex-start;margin-bottom:.75rem;transition:border-color .15s;}
+.wiki-card:hover{border-color:var(--accent);}
+.wiki-thumb{width:72px;height:72px;object-fit:cover;border-radius:var(--radius-sm);flex-shrink:0;}
+.preview-wrap{overflow-x:auto;}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+  <div>
+    <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.2rem;">Analysis Results</div>
+    <h1 style="font-size:1.6rem;font-weight:800;margin:0;letter-spacing:-.02em;">{{ analysis.filename }}</h1>
+    <div style="color:var(--text-secondary);font-size:.82rem;margin-top:.2rem;">{{ analysis.shape.0 }} rows × {{ analysis.shape.1 }} columns</div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{% url 'export_excel' uploaded_pk %}" class="btn-green"><i class="bi bi-file-earmark-excel"></i> Export Excel</a>
+    <a href="{% url 'upload' %}" class="btn-ghost"><i class="bi bi-upload"></i> New Analysis</a>
+  </div>
+</div>
+
+{% with ms=analysis.missing_summary %}
+<div class="kpi-grid">
+  <div class="kpi-card blue"><div class="kpi-value text-accent">{{ analysis.shape.0 }}</div><div class="kpi-label">Rows</div></div>
+  <div class="kpi-card green"><div class="kpi-value text-green">{{ analysis.shape.1 }}</div><div class="kpi-label">Columns</div></div>
+  <div class="kpi-card {% if ms.missing_percentage > 20 %}red{% elif ms.missing_percentage > 0 %}yellow{% else %}green{% endif %}">
+    <div class="kpi-value {% if ms.missing_percentage > 20 %}text-red{% elif ms.missing_percentage > 0 %}text-yellow{% else %}text-green{% endif %}">{{ ms.missing_percentage }}%</div>
+    <div class="kpi-label">Missing Data</div>
+  </div>
+  <div class="kpi-card {% if ms.columns_with_missing > 0 %}yellow{% else %}green{% endif %}">
+    <div class="kpi-value text-yellow">{{ ms.columns_with_missing }}</div>
+    <div class="kpi-label">Cols w/ Missing</div>
+  </div>
+</div>
+{% endwith %}
+
+<div data-tab-group>
+<div class="tabs">
+  <button class="tab active" data-target="#tab-overview"><i class="bi bi-grid-3x3-gap"></i> Overview</button>
+  <button class="tab" data-target="#tab-stats"><i class="bi bi-bar-chart-line"></i> Statistics</button>
+  <button class="tab" data-target="#tab-charts"><i class="bi bi-graph-up-arrow"></i> Visualizations</button>
+  <button class="tab" data-target="#tab-preview"><i class="bi bi-table"></i> Data Preview</button>
+  {% if recommendations %}<button class="tab" data-target="#tab-impute"><i class="bi bi-tools"></i> Imputation <span class="badge badge-yellow ms-1">{{ recommendations|length }}</span></button>{% endif %}
+  {% if api_data %}<button class="tab" data-target="#tab-context"><i class="bi bi-globe"></i> Context</button>{% endif %}
+</div>
+
+<!-- overview -->
+<div class="tab-content active" id="tab-overview">
+  {% if analysis.missing_summary.missing_percentage > 0 %}
+  <div class="chart-box">
+    <div class="chart-title"><i class="bi bi-exclamation-triangle"></i> Missing Values by Column</div>
+    <div id="chart-missing" style="height:260px;"></div>
+  </div>
+  {% endif %}
+  <div class="chart-box">
+    <div class="chart-title"><i class="bi bi-list-ul"></i> Column Overview</div>
+    <div class="preview-wrap">
+      <table class="table">
+        <thead><tr><th>#</th><th>Column</th><th>Type</th><th>Missing</th><th>Missing %</th><th>Outliers</th><th>Detail</th></tr></thead>
+        <tbody>
+          {% for col in analysis.columns %}
+          <tr>
+            <td style="color:var(--text-muted);">{{ forloop.counter }}</td>
+            <td><strong>{{ col }}</strong></td>
+            <td>
+              {% with dtype=analysis.dtypes|get_item:col %}
+                {% if 'int' in dtype or 'float' in dtype %}<span class="type-pill type-numeric">numeric</span>
+                {% elif 'datetime' in dtype %}<span class="type-pill type-datetime">datetime</span>
+                {% else %}<span class="type-pill type-text">text</span>{% endif %}
+                <span style="font-size:.7rem;color:var(--text-muted);">{{ dtype }}</span>
+              {% endwith %}
+            </td>
+            <td>{% with m=analysis.missing_values|get_item:col %}{% if m and m > 0 %}<span class="badge badge-yellow">{{ m }}</span>{% else %}<span class="badge badge-green">0</span>{% endif %}{% endwith %}</td>
+            <td style="color:var(--text-secondary);font-size:.75rem;">{% with m=analysis.missing_values|get_item:col %}{{ m|default:0 }} / {{ analysis.shape.0 }}{% endwith %}</td>
+            <td>{% with o=analysis.outliers|get_item:col %}{% if o and o.count > 0 %}<span class="badge badge-red">{{ o.count }} ({{ o.pct }}%)</span>{% elif o %}<span class="badge badge-green">none</span>{% else %}<span style="color:var(--text-muted);">-</span>{% endif %}{% endwith %}</td>
+            <td>{% with d=analysis.missing_details|get_item:col %}{% if d %}<span style="font-size:.7rem;">{% if d.pandas_na > 0 %}<span class="badge badge-gray me-1">NaN:{{ d.pandas_na }}</span>{% endif %}{% if d.empty_strings > 0 %}<span class="badge badge-gray me-1">"":{{ d.empty_strings }}</span>{% endif %}{% if d.null_keywords > 0 %}<span class="badge badge-gray me-1">kw:{{ d.null_keywords }}</span>{% endif %}</span>{% endif %}{% endwith %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- statistics -->
+<div class="tab-content" id="tab-stats">
+  {% if analysis.stats %}
+  <div class="chart-box">
+    <div class="chart-title"><i class="bi bi-sigma"></i> Descriptive Statistics</div>
+    <div class="preview-wrap">
+      <table class="table">
+        <thead><tr><th>Metric</th>{% for col in analysis.columns %}{% if analysis.stats|get_item:col %}<th>{{ col }}</th>{% endif %}{% endfor %}</tr></thead>
+        <tbody>
+          {% with first=analysis.columns|first %}{% if first %}{% with fs=analysis.stats|get_item:first %}{% if fs %}
+          {% for stat_name, _ in fs.items %}
+          <tr>
+            <td><strong style="color:var(--text-secondary);">{{ stat_name }}</strong></td>
+            {% for col in analysis.columns %}{% with cs=analysis.stats|get_item:col %}{% if cs %}<td>{% with v=cs|get_item:stat_name %}{% if v is None or v == "nan" %}<span style="color:var(--text-muted);">-</span>{% elif v|length > 60 %}<span title="{{ v }}">{{ v|truncatechars:35 }}</span>{% else %}{{ v }}{% endif %}{% endwith %}</td>{% endif %}{% endwith %}{% endfor %}
+          </tr>
+          {% endfor %}
+          {% endif %}{% endwith %}{% endif %}{% endwith %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+  {% if analysis.outliers %}
+  <div class="chart-box">
+    <div class="chart-title"><i class="bi bi-exclamation-octagon"></i> Outlier Report (IQR)</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem;">
+      {% for col in analysis.columns %}{% with o=analysis.outliers|get_item:col %}{% if o %}
+      <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.75rem;">
+        <div style="font-weight:600;font-size:.82rem;margin-bottom:.4rem;">{{ col }}</div>
+        {% if o.count > 0 %}<span class="badge badge-red">{{ o.count }} · {{ o.pct }}%</span><div style="font-size:.7rem;color:var(--text-muted);margin-top:.35rem;">Fences: [{{ o.lower }}, {{ o.upper }}]</div>
+        {% else %}<span class="badge badge-green">✓ Clean</span>{% endif %}
+      </div>
+      {% endif %}{% endwith %}{% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- visualizations -->
+<div class="tab-content" id="tab-charts">
+  <div id="section-corr" style="display:none;" class="chart-box"><div class="chart-title"><i class="bi bi-grid"></i> Correlation Heatmap</div><div id="chart-corr" style="height:420px;"></div></div>
+  <div id="section-scatter" style="display:none;" class="chart-box"><div class="chart-title"><i class="bi bi-diagram-3"></i> Pair Plot</div><div id="chart-scatter" style="height:520px;"></div></div>
+  <div id="section-box" style="display:none;" class="chart-box"><div class="chart-title"><i class="bi bi-box"></i> Box Plots</div><div id="chart-box" style="height:380px;"></div></div>
+  <div id="histograms-grid" class="charts-grid"></div>
+  <div id="barcharts-grid" class="charts-grid"></div>
+  <div id="no-charts-msg" class="alert alert-info" style="display:none;"><i class="bi bi-info-circle"></i> No numeric or categorical columns detected.</div>
+</div>
+
+<!-- data preview -->
+<div class="tab-content" id="tab-preview">
+  <div class="chart-box">
+    <div class="chart-title"><i class="bi bi-eye"></i> First 10 Rows</div>
+    {% if analysis.data_preview %}
+    <div class="preview-wrap">
+      <table class="table">
+        <thead><tr><th>#</th>{% for col in analysis.data_preview.columns %}<th title="{{ col }}">{{ col|truncatechars:20 }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for row in analysis.data_preview.rows %}
+          <tr><td style="color:var(--text-muted);">{{ forloop.counter }}</td>{% for cell in row %}<td title="{{ cell }}">{{ cell|default:"-"|truncatechars:25 }}</td>{% endfor %}</tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}<p style="color:var(--text-muted);">Preview not available.</p>{% endif %}
+  </div>
+</div>
+
+<!-- imputation -->
+{% if recommendations %}
+<div class="tab-content" id="tab-impute">
+  {% if not sklearn_available %}
+  <div class="alert alert-warning mb-3">
+    <i class="bi bi-exclamation-triangle"></i>
+    <strong>Advanced imputation disabled:</strong> {{ sklearn_error|default:"scikit-learn is not installed in the active environment." }}
+  </div>
+  {% endif %}
+  <div class="alert alert-info mb-3"><i class="bi bi-info-circle"></i><div>Strategies are <strong>auto-recommended</strong> based on missingness %, column type, and cross-column patterns. Override any before downloading. Your original data is never modified.</div></div>
+  <form id="imputeForm">
+    {% for col, rec in recommendations.items %}
+    <div class="impute-row">
+      <div>
+        <div style="font-weight:600;font-size:.85rem;">{{ col }}</div>
+        <span class="type-pill {% if rec.is_numeric %}type-numeric{% else %}type-text{% endif %}">{% if rec.is_numeric %}numeric{% else %}text{% endif %}</span>
+      </div>
+      <div><span class="badge {% if rec.pct > 30 %}badge-red{% elif rec.pct > 5 %}badge-yellow{% else %}badge-green{% endif %}" style="font-size:.72rem;">{{ rec.pct }}%</span></div>
+      <div>
+        <select class="select strategy-select" name="{{ col }}" data-recommended="{{ rec.strategy }}">
+          {% if rec.is_numeric %}{% for val, label in numeric_strategies %}<option value="{{ val }}" {% if val == rec.strategy %}selected{% endif %}{% if not sklearn_available and val in 'knn iterative' %} disabled{% endif %}>{{ label }}{% if val == rec.strategy %} ← auto{% endif %}</option>{% endfor %}
+          {% else %}{% for val, label in categorical_strategies %}<option value="{{ val }}" {% if val == rec.strategy %}selected{% endif %}{% if not sklearn_available and val == 'knn' %} disabled{% endif %}>{{ label }}{% if val == rec.strategy %} ← auto{% endif %}</option>{% endfor %}{% endif %}
+        </select>
+        <input type="text" class="input mt-1 constant-input" name="const_{{ col }}" placeholder="Fill value (default: 0 / Unknown)" style="display:{% if rec.strategy == 'constant' %}block{% else %}none{% endif %};">
+      </div>
+      <div style="font-size:.75rem;color:var(--text-secondary);font-style:italic;">{{ rec.strategy|capfirst }} recommended</div>
+    </div>
+    {% endfor %}
+    <div class="d-flex gap-2 mt-3">
+      <button type="button" class="btn-primary" id="downloadImputedBtn"><i class="bi bi-download"></i> Apply & Download CSV</button>
+      <button type="button" class="btn-ghost" id="resetStrategiesBtn"><i class="bi bi-arrow-counterclockwise"></i> Reset</button>
+    </div>
+  </form>
+  <div id="imputeStatus" class="alert mt-3" style="display:none;"></div>
+</div>
+{% endif %}
+
+<!-- context -->
+{% if api_data %}
+<div class="tab-content" id="tab-context">
+  <p style="font-size:.82rem;color:var(--text-secondary);margin-bottom:1rem;">Wikipedia articles discovered from your dataset filename and column names.</p>
+  {% for item in api_data %}
+    {% if item.error %}<div class="alert alert-warning">{{ item.error }}</div>
+    {% else %}
+    <div class="wiki-card">
+      {% if item.thumbnail %}<img src="{{ item.thumbnail }}" alt="{{ item.title }}" class="wiki-thumb">{% endif %}
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:.9rem;margin-bottom:.2rem;"><a href="{{ item.url }}" target="_blank" rel="noopener" style="color:var(--text-primary);text-decoration:none;">{{ item.title }}</a></div>
+        {% if item.description %}<div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.5rem;">{{ item.description }}</div>{% endif %}
+        <p style="font-size:.8rem;color:var(--text-secondary);line-height:1.55;margin-bottom:.5rem;">{{ item.extract }}</p>
+        <a href="{{ item.url }}" target="_blank" rel="noopener" class="btn-ghost" style="font-size:.75rem;padding:.3rem .75rem;">Read on Wikipedia <i class="bi bi-arrow-up-right"></i></a>
+      </div>
+    </div>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const PLOT = {{ plot_data_json|safe }};
+const PC = { responsive:true, displaylogo:false, displayModeBar:true };
+const BL = {
+  paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)',
+  font:{family:'system-ui',size:11,color:'#8b93a8'},
+  margin:{t:24,r:16,b:56,l:56},
+  xaxis:{gridcolor:'#2a3045',zerolinecolor:'#2a3045',color:'#8b93a8'},
+  yaxis:{gridcolor:'#2a3045',zerolinecolor:'#2a3045',color:'#8b93a8'},
+  legend:{bgcolor:'rgba(0,0,0,0)',font:{color:'#8b93a8'}},
+};
+const CL = ['#4f6ef7','#a855f7','#22c55e','#f59e0b','#06b6d4','#ef4444','#ec4899','#14b8a6'];
+
+if(PLOT.missing_chart){const mc=PLOT.missing_chart;Plotly.newPlot('chart-missing',[{type:'bar',x:mc.cols,y:mc.pcts,text:mc.counts.map((c,i)=>`${c} · ${mc.pcts[i]}%`),hovertemplate:'<b>%{x}</b><br>%{text}<extra></extra>',marker:{color:mc.pcts.map(p=>p>20?'#ef4444':p>5?'#f59e0b':'#22c55e')}}],{...BL,yaxis:{...BL.yaxis,title:'Missing %',ticksuffix:'%'},xaxis:{...BL.xaxis,tickangle:-30},margin:{t:20,r:12,b:90,l:55}},PC);}
+
+const hGrid=document.getElementById('histograms-grid');
+(PLOT.histograms||[]).forEach((h,i)=>{
+  const w=document.createElement('div');w.className='chart-box';
+  w.innerHTML=`<div class="chart-title"><i class="bi bi-bar-chart"></i> ${h.col}</div><div id="hist-${i}" style="height:220px;"></div>`;
+  hGrid.appendChild(w);
+  Plotly.newPlot(`hist-${i}`,[
+    {type:'histogram',x:h.values,nbinsx:30,marker:{color:CL[i%CL.length],opacity:.85},hovertemplate:'Range:%{x}<br>Count:%{y}<extra></extra>'},
+    {type:'scatter',mode:'lines',x:[h.mean,h.mean],y:[0,1],yref:'paper',line:{color:'#ef4444',dash:'dash',width:1.5},name:`μ ${h.mean}`}
+  ],{...BL,showlegend:true,margin:{t:20,r:10,b:45,l:45},xaxis:{...BL.xaxis,title:h.col},yaxis:{...BL.yaxis,title:'Count'}},PC);
+});
+
+if(PLOT.box_data&&PLOT.box_data.length){document.getElementById('section-box').style.display='block';Plotly.newPlot('chart-box',PLOT.box_data.map((b,i)=>({type:'box',y:b.values,name:b.col,boxpoints:'outliers',marker:{color:CL[i%CL.length],size:3},line:{width:1.5}})),{...BL,showlegend:false},PC);}
+
+if(PLOT.correlation){document.getElementById('section-corr').style.display='block';const c=PLOT.correlation;Plotly.newPlot('chart-corr',[{type:'heatmap',z:c.z,x:c.cols,y:c.cols,colorscale:[[0,'#ef4444'],[.5,'#1e2330'],[1,'#4f6ef7']],zmid:0,zmin:-1,zmax:1,text:c.z.map(r=>r.map(v=>v!==null?v.toFixed(2):'')),texttemplate:'%{text}',hovertemplate:'<b>%{x}</b> × <b>%{y}</b><br>r=%{z:.3f}<extra></extra>'}],{...BL,margin:{t:24,r:16,b:90,l:90},xaxis:{...BL.xaxis,tickangle:-30}},PC);}
+
+if(PLOT.scatter_matrix){document.getElementById('section-scatter').style.display='block';const sm=PLOT.scatter_matrix;Plotly.newPlot('chart-scatter',[{type:'splom',dimensions:sm.cols.map(col=>({label:col,values:sm.data[col]})),marker:{size:3,opacity:.55,color:'#4f6ef7'},showupperhalf:false,diagonal:{visible:true}}],{...BL,dragmode:'select'},PC);}
+
+const bGrid=document.getElementById('barcharts-grid');
+(PLOT.bar_charts||[]).forEach((b,i)=>{
+  const w=document.createElement('div');w.className='chart-box';
+  w.innerHTML=`<div class="chart-title"><i class="bi bi-bar-chart-horizontal"></i> ${b.col}</div><div id="bar-${i}" style="height:250px;"></div>`;
+  bGrid.appendChild(w);
+  Plotly.newPlot(`bar-${i}`,[{type:'bar',x:b.values,y:b.labels,orientation:'h',marker:{color:CL[i%CL.length],opacity:.85},hovertemplate:'<b>%{y}</b><br>%{x}<extra></extra>'}],{...BL,xaxis:{...BL.xaxis,title:'Count'},yaxis:{...BL.yaxis,automargin:true},margin:{t:20,r:20,b:50,l:130}},PC);
+});
+
+const hasCharts=(PLOT.histograms?.length||PLOT.bar_charts?.length||PLOT.box_data?.length||PLOT.correlation||PLOT.scatter_matrix);
+if(!hasCharts)document.getElementById('no-charts-msg').style.display='flex';
+
+// imputation
+document.querySelectorAll('.strategy-select').forEach(sel=>{
+  sel.addEventListener('change',function(){
+    const ci=this.closest('.impute-row').querySelector('.constant-input');
+    ci.style.display=this.value==='constant'?'block':'none';
+  });
+});
+document.getElementById('resetStrategiesBtn')?.addEventListener('click',()=>{
+  document.querySelectorAll('.strategy-select').forEach(sel=>{
+    sel.value=sel.dataset.recommended;
+    sel.closest('.impute-row').querySelector('.constant-input').style.display=sel.value==='constant'?'block':'none';
+  });
+  showToast('Reset to recommended strategies');
+});
+document.getElementById('downloadImputedBtn')?.addEventListener('click',async()=>{
+  const btn=document.getElementById('downloadImputedBtn');
+  const status=document.getElementById('imputeStatus');
+  btn.disabled=true;btn.innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Processing…';status.style.display='none';
+  const strategies={},constants={};
+  document.querySelectorAll('.strategy-select').forEach(s=>{strategies[s.name]=s.value;});
+  document.querySelectorAll('.constant-input').forEach(inp=>{if(inp.value.trim()){constants[inp.name.replace('const_','')]=inp.value.trim();}});
+  try{
+    const r=await fetch('/impute/{{ uploaded_pk }}/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},body:JSON.stringify({strategies,constants})});
+    if(!r.ok){const e=await r.json();throw new Error(e.error||'Server error');}
+    const blob=await r.blob();const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download='imputed.csv';a.click();URL.revokeObjectURL(url);
+    showToast('Imputed CSV downloaded!');
+  }catch(e){
+    status.className='alert alert-danger mt-3';status.innerHTML=`<i class="bi bi-x-circle"></i> ${e.message}`;status.style.display='flex';
+  }finally{btn.disabled=false;btn.innerHTML='<i class="bi bi-download"></i> Apply & Download CSV';}
+});
+</script>
+{% endblock %}
