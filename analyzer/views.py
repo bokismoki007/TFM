@@ -1,4 +1,4 @@
-import json, os, traceback
+import json, os
 import pandas as pd
 from django.contrib import messages
 from django.contrib.auth import login, logout
@@ -7,11 +7,11 @@ from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
-from .analysis import analyze_csv
+from .analysis import analyze_file
 from .api_client import fetch_context
 from .export import generate_excel
 from .forms import UploadFileForm
-from .imputation import recommend_strategies, get_imputed_csv, NUMERIC_STRATEGIES, CATEGORICAL_STRATEGIES, SKLEARN_AVAILABLE
+from .imputation import get_imputed_csv, NUMERIC_STRATEGIES, CATEGORICAL_STRATEGIES, SKLEARN_AVAILABLE
 from .models import UploadedFile
 
 
@@ -23,8 +23,8 @@ def upload_file(request):
             if request.user.is_authenticated: uploaded.user=request.user
             uploaded.save()
             file_path=uploaded.file.path
-            analysis=analyze_csv(file_path)
-            uploaded.analysis_result=analysis;
+            analysis=analyze_file(file_path)
+            uploaded.analysis_result=analysis
             uploaded.save()
             return redirect('results',pk=uploaded.pk)
     else: form=UploadFileForm()
@@ -67,34 +67,38 @@ def export_excel(request,pk):
 
 @require_POST
 def impute(request,pk):
-    uploaded=get_object_or_404(UploadedFile,pk=pk)
-    analysis=uploaded.analysis_result or {}
+    uploaded = get_object_or_404(UploadedFile,pk=pk)
+    analysis = uploaded.analysis_result or {}
     try:
-        body=json.loads(request.body); strategies=body.get('strategies',{}); constants=body.get('constants',{})
+        body = json.loads(request.body); strategies=body.get('strategies',{}); constants=body.get('constants',{})
 
         if not uploaded.file or not uploaded.file.name:
             return JsonResponse({'error':'Original file is no longer available. Please re-upload your dataset.'},status=400)
-        file_path=uploaded.file.path
+        file_path = uploaded.file.path
         if not os.path.exists(file_path):
             return JsonResponse({'error':'Original file is no longer available on the server. Please re-upload your dataset.'},status=400)
 
-        df=pd.read_csv(file_path, keep_default_na=False, na_values=[])
-        csv_bytes=get_imputed_csv(df,strategies,constants)
-        fname=analysis.get('filename','data').replace('.csv','')
-        resp=HttpResponse(csv_bytes,content_type='text/csv')
-        resp['Content-Disposition']=f'attachment; filename="{fname}_imputed.csv"'
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext == '.xlsx':
+            df = pd.read_excel(file_path)
+        else:
+            df = pd.read_csv(file_path, keep_default_na=False, na_values=[])
+        csv_bytes = get_imputed_csv(df,strategies,constants)
+        fname = analysis.get('filename','data').replace('.csv','')
+        resp = HttpResponse(csv_bytes,content_type='text/csv')
+        resp['Content-Disposition'] = f'attachment; filename="{fname}_imputed.csv"'
         return resp
     except Exception as e: return JsonResponse({'error':str(e)},status=500)
 
 @login_required
 def history(request):
-    uploads=UploadedFile.objects.filter(user=request.user).order_by('-uploaded_at')
+    uploads = UploadedFile.objects.filter(user=request.user).order_by('-uploaded_at')
     return render(request,'analyzer/history.html',{'uploads':uploads})
 
 @login_required
 @require_POST
 def delete_analysis(request,pk):
-    uploaded=get_object_or_404(UploadedFile,pk=pk,user=request.user)
+    uploaded = get_object_or_404(UploadedFile,pk=pk,user=request.user)
     uploaded.delete(); messages.success(request,'Analysis deleted.')
     return redirect('history')
 

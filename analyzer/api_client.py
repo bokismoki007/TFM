@@ -3,6 +3,8 @@ import re
 import logging
 import requests
 import pandas as pd
+from django.core.cache import cache
+import hashlib
 
 logger = logging.getLogger('analyzer.api_client')
 
@@ -80,6 +82,13 @@ def fetch_wiki_summary(title):
 
 
 def fetch_context(column_names, filename=''):
+    cache_string = f"{filename}_{'_'.join(column_names[:4])}"
+    cache_key = "wiki_" + hashlib.md5(cache_string.encode()).hexdigest()
+
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        return cached_data
+
     queries = []
     if filename:
         base = re.sub(r'[\._\-]+', ' ', os.path.splitext(filename)[0] if '.' in filename else filename)
@@ -106,4 +115,6 @@ def fetch_context(column_names, filename=''):
         if len(results) >= 4:
             break
 
-    return results if results else [{'error': 'No Wikipedia context found for this dataset.'}]
+    final_results = results if results else [{'error': 'No Wikipedia context found for this dataset.'}]
+    cache.set(cache_key, final_results, 86400)
+    return final_results

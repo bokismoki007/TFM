@@ -1,4 +1,3 @@
-import io
 from openpyxl import Workbook
 from openpyxl.styles import (
     Font, PatternFill, Alignment, Border, Side, numbers
@@ -6,9 +5,6 @@ from openpyxl.styles import (
 from openpyxl.utils import get_column_letter
 
 import io
-import re
-import numpy as np
-import pandas as pd
 
 from sklearn.experimental import enable_iterative_imputer
 
