@@ -205,9 +205,13 @@ def _encode_all_categoricals(work: pd.DataFrame, target_cols: list):
                 continue
             le = LabelEncoder()
             le.fit(non_null)
+
             work[col] = work[col].apply(
                 lambda x: le.transform([str(x)])[0] if pd.notna(x) else np.nan
             )
+
+            work[col] = pd.to_numeric(work[col], errors='coerce')
+
             if col in target_cols:
                 encoders[col] = le
     return work, encoders
