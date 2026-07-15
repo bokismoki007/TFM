@@ -92,7 +92,9 @@ def impute(request,pk):
 
 @login_required
 def history(request):
-    uploads = UploadedFile.objects.filter(user=request.user).order_by('-uploaded_at')
+    uploads = UploadedFile.objects.filter(
+        user=request.user
+    ).order_by('-uploaded_at')
     return render(request,'analyzer/history.html',{'uploads':uploads})
 
 @login_required

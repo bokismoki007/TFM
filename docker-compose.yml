@@ -9,4 +9,4 @@ services:
       - .:/app
     environment:
       - DJANGO_DEBUG=False
-      - DJANGO_SECRET_KEY=super-secret-production-key
+      - DJANGO_SECRET_KEY=${SECRET_KEY}

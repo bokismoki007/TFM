@@ -199,7 +199,7 @@
     </div>
     {% endfor %}
     <div class="d-flex gap-2 mt-3">
-      <button type="button" class="btn-primary" id="downloadImputedBtn"><i class="bi bi-download"></i> Apply & Download CSV</button>
+      <button type="button" class="btn-primary" id="downloadImputedBtn"><i class="bi bi-download"></i> Apply & Download CSV / XLS</button>
       <button type="button" class="btn-ghost" id="resetStrategiesBtn"><i class="bi bi-arrow-counterclockwise"></i> Reset</button>
     </div>
   </form>
@@ -304,7 +304,7 @@ document.getElementById('downloadImputedBtn')?.addEventListener('click',async()=
     showToast('Imputed CSV downloaded!');
   }catch(e){
     status.className='alert alert-danger mt-3';status.innerHTML=`<i class="bi bi-x-circle"></i> ${e.message}`;status.style.display='flex';
-  }finally{btn.disabled=false;btn.innerHTML='<i class="bi bi-download"></i> Apply & Download CSV';}
+  }finally{btn.disabled=false;btn.innerHTML='<i class="bi bi-download"></i> Apply & Download CSV / XLS';}
 });
 </script>
 {% endblock %}

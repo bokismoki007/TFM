@@ -18,4 +18,3 @@ class UploadFileForm(forms.ModelForm):
             if file.size > 50 * 1024 * 1024:
                 raise forms.ValidationError('File size cannot exceed 50 MB.')
         return file
-        return file

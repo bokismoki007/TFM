@@ -26,7 +26,7 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-9#^aytj!8f&_6(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '.onrender.com']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com']
 
 # Application definition
 
@@ -74,10 +74,17 @@ WSGI_APPLICATION = 'autoinsight.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+if os.environ.get('RENDER'):
+    DB_PATH = os.path.join('/tmp', 'db.sqlite3')
+    STATIC_PATH = os.path.join('/tmp', 'staticfiles')
+else:
+    DB_PATH = BASE_DIR / 'db.sqlite3'
+    STATIC_PATH = BASE_DIR / 'staticfiles'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join('/tmp', 'db.sqlite3'),
+        'NAME': DB_PATH,
     }
 }
 
@@ -123,7 +130,7 @@ LOGOUT_REDIRECT_URL = '/'
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join('/tmp', 'staticfiles')
+STATIC_ROOT = STATIC_PATH
 
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
